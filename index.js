@@ -1,64 +1,96 @@
 const { createCanvas, loadImage } = require("@napi-rs/canvas");
-const { twitterClient } = require("./twitterClient.js");
-require("dotenv").config({ path: __dirname + "/.env" });
-const axios = require("axios");
 const fs = require("fs");
+require("dotenv").config({ path: __dirname + "/.env" });
+const { twitterClient } = require("./twitterClient.js")
+const path = require("path");
 
-const getRandomWord = async () => {
+const loadWords = () => {
     try {
-        const response = await axios.get('https://random-word-api.herokuapp.com/word');
-        return response.data[0];
+        const language = process.env.LANGUAGE || 'en';
+        const data = fs.readFileSync(`./language/${language}.json`, "utf8");
+        return JSON.parse(data).words;
     } catch (error) {
-        console.error('Error getting random word:', error);
-        throw error;
+        console.error("Error loading JSON file:", error);
+        return [];
     }
+};
+
+const getRandomWordFromList = (wordList) => {
+    const randomIndex = Math.floor(Math.random() * wordList.length);
+    return wordList[randomIndex];
+};
+
+const getRandomWord = () => {
+    const wordList = loadWords();
+    if (wordList.length === 0) {
+        throw new Error("Empty word list.");
+    }
+    return getRandomWordFromList(wordList);
 };
 
 const generateImage = async (word) => {
     const canvas = createCanvas(800, 400);
     const ctx = canvas.getContext("2d");
 
-    const background = await loadImage("background.png");
-    ctx.filter = "blur(5px)";
+    const backgroundFiles = fs.readdirSync("backgrounds/");
+    const randomIndex = Math.floor(Math.random() * backgroundFiles.length);
+    const randomBackground = backgroundFiles[randomIndex];
+
+    const background = await loadImage(`backgrounds/${randomBackground}`);
+    ctx.filter = "blur(6px)";
     ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
 
     ctx.filter = "blur(0px)";
-    ctx.font = "bold 100px Arial";
-    ctx.fillStyle = "white";
+    ctx.font = "bold 85px Arial";
+    ctx.fillStyle = "#000000";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    ctx.fillText(word, canvas.width / 2, canvas.height / 2);
+    const textX = canvas.width / 2;
+    const textY = canvas.height / 2;
 
-    const buffer = canvas.toBuffer("image/png");
-    const imagePath = `generated/${word}.png`;
-    fs.writeFileSync(imagePath, buffer);
+    const borderWidth = 2;
+    ctx.lineWidth = borderWidth;
+    ctx.strokeStyle = "#ffffff";
 
-    return imagePath;
+    for (let offsetX = -borderWidth; offsetX <= borderWidth; offsetX++) {
+        for (let offsetY = -borderWidth; offsetY <= borderWidth; offsetY++) {
+            ctx.strokeText(word, textX + offsetX, textY + offsetY);
+        }
+    }
+
+    ctx.fillText(word, textX, textY);
+
+    return canvas.toBuffer("image/png");
 };
 
 const tweetWithImage = async () => {
     try {
         const randomWord = await getRandomWord();
 
-        const imagePath = await generateImage(randomWord);
+        const imageBuffer = await generateImage(randomWord);
 
-        const mediaId = await twitterClient.v1.uploadMedia(imagePath);
+        const tempImagePath = path.join(__dirname, "img.png");
+        fs.writeFileSync(tempImagePath, imageBuffer);
+
+        const mediaId = await twitterClient.v1.uploadMedia(tempImagePath);
 
         await twitterClient.v2.tweet({
             text: `${randomWord}`,
             media: { media_ids: [mediaId] },
         });
 
-        console.log("Tweet com imagem enviado com sucesso!");
+        console.log(`Tweet with Word "${randomWord}" + image successfully sent`);
+
+        fs.unlinkSync(tempImagePath);
     } catch (error) {
-        console.error("Erro ao enviar o tweet com imagem:", error);
+        console.error("Error sending tweet with image:", error);
     }
 };
 
 const tweetEvery10Minutes = () => {
     tweetWithImage();
-    
+
     setInterval(tweetWithImage, 600000);
 };
 
