@@ -1,6 +1,6 @@
 {
   "name": "randomwordtweet",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "send a random tweet every 10 minutes",
   "main": "index.js",
   "scripts": {

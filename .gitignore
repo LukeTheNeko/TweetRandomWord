@@ -2,5 +2,3 @@
 .env.dev
 package-lock.json
 node_modules
-word.js
-forcetxt.js
