@@ -38,4 +38,4 @@ APP_ID=""
 </pre>
 
 <h2>License</h2>
-<p>This project is licensed under the <a href="LICENSE.txt">AGPL-3.0 license</a>.</p>
+<p>This project is licensed under the <a href="LICENSE.txt">MIT license</a>.</p>
